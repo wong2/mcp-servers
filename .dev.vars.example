@@ -1,0 +1,6 @@
+# No Worker env vars are required.
+#
+# Each service uses the incoming MCP Authorization bearer token as its upstream
+# API token:
+# - /weread/mcp: Bearer <WeRead API token>
+# - /caiyun/mcp: Bearer <Caiyun Weather API token>

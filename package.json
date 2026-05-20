@@ -1,0 +1,32 @@
+{
+  "name": "mcp-servers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Remote MCP servers for WeRead and Caiyun Weather on Cloudflare Workers.",
+  "scripts": {
+    "dev": "vite dev",
+    "start": "vite dev",
+    "build": "vite build",
+    "preview": "pnpm build && vite preview",
+    "deploy": "pnpm build && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm typecheck && pnpm build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "agents": "0.12.4",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "4.20260517.1",
+    "typescript": "6.0.3",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

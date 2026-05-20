@@ -1,0 +1,2232 @@
+openapi: 3.0.3
+info:
+  title: 微信读书 Agent Gateway API
+  version: 1.0.3
+  description: |
+    微信读书助手通过统一网关 `POST /api/agent/gateway` 调用接口。
+
+    所有业务参数必须平铺在 JSON body 顶层，与 `api_name`、`skill_version`
+    同级，不要包在 `params`、`data`、`body` 等对象里。每次请求必须携带
+    `skill_version`，当前技能文档版本为 `1.0.3`。
+
+    逻辑接口由 `api_name` 区分。本文档用一个真实网关 Operation 配合
+    `oneOf`/`discriminator` 完整描述所有接口请求体；响应体也按各
+    `api_name` 建模。若响应出现 `upgrade_info`，调用方应暂停当前操作并按
+    `upgrade_info.message` 指引升级后重试。
+servers:
+  - url: https://i.weread.qq.com
+    description: 微信读书接口域名
+security:
+  - bearerAuth: []
+tags:
+  - name: Gateway
+    description: Agent API Gateway 统一入口
+  - name: Search
+    description: 搜索书籍、作者、文章、公众号、全文、书单等内容
+  - name: Book
+    description: 书籍详情、章节目录和阅读进度
+  - name: Shelf
+    description: 书架、电子书、专辑/有声书与文章收藏入口
+  - name: Notes
+    description: 个人笔记本、划线、想法、热门划线和划线下评论
+  - name: Review
+    description: 书籍公开点评与单条想法详情
+  - name: ReadData
+    description: 阅读统计、阅读时长、偏好分析和年度数据
+  - name: Discover
+    description: 个性化推荐与相似书推荐
+paths:
+  /api/agent/gateway:
+    post:
+      tags:
+        - Gateway
+      operationId: callWeReadAgentGateway
+      summary: 调用微信读书 Agent Gateway
+      description: |
+        统一调用入口。请求体中的 `api_name` 指定要调用的逻辑接口，其余字段是
+        该接口的业务参数，且必须全部平铺在 body 顶层。
+
+        已建模的 `api_name` 包括：
+        `/store/search`、`/book/info`、`/book/chapterinfo`、`/book/getprogress`、
+        `/shelf/sync`、`/user/notebooks`、`/book/bookmarklist`、
+        `/review/list/mine`、`/book/underlines`、`/book/bestbookmarks`、
+        `/book/readreviews`、`/review/single`、`/review/list`、
+        `/readdata/detail`、`/book/recommend`、`/book/similar`、`/_list`。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/StoreSearchRequest'
+                - $ref: '#/components/schemas/BookInfoRequest'
+                - $ref: '#/components/schemas/BookChapterInfoRequest'
+                - $ref: '#/components/schemas/BookGetProgressRequest'
+                - $ref: '#/components/schemas/ShelfSyncRequest'
+                - $ref: '#/components/schemas/UserNotebooksRequest'
+                - $ref: '#/components/schemas/BookBookmarkListRequest'
+                - $ref: '#/components/schemas/ReviewListMineRequest'
+                - $ref: '#/components/schemas/BookUnderlinesRequest'
+                - $ref: '#/components/schemas/BookBestBookmarksRequest'
+                - $ref: '#/components/schemas/BookReadReviewsRequest'
+                - $ref: '#/components/schemas/ReviewSingleRequest'
+                - $ref: '#/components/schemas/ReviewListRequest'
+                - $ref: '#/components/schemas/ReadDataDetailRequest'
+                - $ref: '#/components/schemas/BookRecommendRequest'
+                - $ref: '#/components/schemas/BookSimilarRequest'
+                - $ref: '#/components/schemas/ListApisRequest'
+              discriminator:
+                propertyName: api_name
+                mapping:
+                  /store/search: '#/components/schemas/StoreSearchRequest'
+                  /book/info: '#/components/schemas/BookInfoRequest'
+                  /book/chapterinfo: '#/components/schemas/BookChapterInfoRequest'
+                  /book/getprogress: '#/components/schemas/BookGetProgressRequest'
+                  /shelf/sync: '#/components/schemas/ShelfSyncRequest'
+                  /user/notebooks: '#/components/schemas/UserNotebooksRequest'
+                  /book/bookmarklist: '#/components/schemas/BookBookmarkListRequest'
+                  /review/list/mine: '#/components/schemas/ReviewListMineRequest'
+                  /book/underlines: '#/components/schemas/BookUnderlinesRequest'
+                  /book/bestbookmarks: '#/components/schemas/BookBestBookmarksRequest'
+                  /book/readreviews: '#/components/schemas/BookReadReviewsRequest'
+                  /review/single: '#/components/schemas/ReviewSingleRequest'
+                  /review/list: '#/components/schemas/ReviewListRequest'
+                  /readdata/detail: '#/components/schemas/ReadDataDetailRequest'
+                  /book/recommend: '#/components/schemas/BookRecommendRequest'
+                  /book/similar: '#/components/schemas/BookSimilarRequest'
+                  /_list: '#/components/schemas/ListApisRequest'
+            examples:
+              searchBook:
+                summary: 搜索电子书
+                value:
+                  api_name: /store/search
+                  keyword: 三体
+                  scope: 10
+                  count: 10
+                  skill_version: 1.0.3
+              notebooksNextPage:
+                summary: 笔记本下一页
+                value:
+                  api_name: /user/notebooks
+                  count: 20
+                  lastSort: 1778312777
+                  skill_version: 1.0.3
+              readReviews:
+                summary: 查询划线下的想法
+                value:
+                  api_name: /book/readreviews
+                  bookId: "3300045871"
+                  chapterUid: 107
+                  reviews:
+                    - range: 900-2004
+                      count: 20
+                      maxIdx: 0
+                      synckey: 0
+                  skill_version: 1.0.3
+      responses:
+        '200':
+          description: |
+            网关返回 JSON。`errcode` 非 0 时表示错误；成功响应的字段因
+            `api_name` 不同而不同。
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/StoreSearchResponse'
+                  - $ref: '#/components/schemas/BookInfoResponse'
+                  - $ref: '#/components/schemas/BookChapterInfoResponse'
+                  - $ref: '#/components/schemas/BookGetProgressResponse'
+                  - $ref: '#/components/schemas/ShelfSyncResponse'
+                  - $ref: '#/components/schemas/UserNotebooksResponse'
+                  - $ref: '#/components/schemas/BookBookmarkListResponse'
+                  - $ref: '#/components/schemas/ReviewListMineResponse'
+                  - $ref: '#/components/schemas/BookUnderlinesResponse'
+                  - $ref: '#/components/schemas/BookBestBookmarksResponse'
+                  - $ref: '#/components/schemas/BookReadReviewsResponse'
+                  - $ref: '#/components/schemas/ReviewSingleResponse'
+                  - $ref: '#/components/schemas/ReviewListResponse'
+                  - $ref: '#/components/schemas/ReadDataDetailResponse'
+                  - $ref: '#/components/schemas/BookRecommendResponse'
+                  - $ref: '#/components/schemas/BookSimilarResponse'
+                  - $ref: '#/components/schemas/ListApisResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未提供或未通过鉴权的 API Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务端错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        使用 `Authorization: Bearer $WEREAD_API_KEY` 鉴权。API Key 形如
+        `wrk-xxxxxxxx`，并自动绑定用户身份（vid）。
+  schemas:
+    GatewayResponseMeta:
+      type: object
+      description: 所有网关响应都可能包含的通用字段。
+      properties:
+        errcode:
+          type: integer
+          description: 错误码；非 0 表示调用失败。成功响应中可能不存在或为 0。
+          example: 0
+        errmsg:
+          type: string
+          description: 错误信息或提示文案。
+        upgrade_info:
+          $ref: '#/components/schemas/UpgradeInfo'
+    UpgradeInfo:
+      type: object
+      description: |
+        技能升级提示。响应中出现该字段时，应立即暂停当前操作，按 message 指引
+        完成升级后再重新执行请求。
+      properties:
+        message:
+          type: string
+          description: 面向调用方的升级说明。
+        version:
+          type: string
+          description: 建议升级到的技能版本。
+        url:
+          type: string
+          format: uri
+          description: 升级说明或下载地址。
+      additionalProperties: true
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          required:
+            - errcode
+          properties:
+            errcode:
+              type: integer
+              description: 非 0 错误码。
+              example: 401
+            errmsg:
+              type: string
+              description: 中文错误提示或服务端返回的错误信息。
+              example: API Key 无效或已过期
+
+    StoreSearchRequest:
+      type: object
+      description: "`/store/search` 搜索请求。根据 `scope` 切换搜索 tab。"
+      required:
+        - api_name
+        - keyword
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /store/search
+          description: 逻辑接口名，固定为 `/store/search`。
+        keyword:
+          type: string
+          description: 搜索关键词。
+          example: 三体
+        scope:
+          type: integer
+          description: |
+            搜索类型。未传时服务端默认 `10`（电子书）。
+            `0`=全部，`10`=电子书，`16`=网文小说，`14`=微信听书/有声书/专辑，
+            `6`=作者，`12`=全文，`13`=书单，`2`=公众号，`4`=文章。
+          enum:
+            - 0
+            - 2
+            - 4
+            - 6
+            - 10
+            - 12
+            - 13
+            - 14
+            - 16
+          default: 10
+        maxIdx:
+          type: integer
+          minimum: 0
+          description: 翻页偏移；下一页使用上一页最后一条结果的 `searchIdx`。
+          default: 0
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量；不传则服务端默认 15。用户未指定数量时建议不传。
+          default: 15
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    StoreSearchResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/store/search` V3 格式搜索响应。"
+          properties:
+            sid:
+              type: string
+              description: 搜索会话 ID。
+            hasMore:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否还有更多结果，`1` 表示有，`0` 表示无。
+            results:
+              type: array
+              description: 搜索结果分组数组；`scope=0` 时会返回多个分组。
+              items:
+                $ref: '#/components/schemas/SearchResultGroup'
+
+    BookInfoRequest:
+      type: object
+      description: "`/book/info` 获取书籍基本信息。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/info
+          description: 逻辑接口名，固定为 `/book/info`。
+        bookId:
+          type: string
+          description: 书籍 ID。用户输入书名时应先通过 `/store/search` 获取。
+          example: "3300045871"
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookInfoResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - $ref: '#/components/schemas/BookDetail'
+
+    BookChapterInfoRequest:
+      type: object
+      description: "`/book/chapterinfo` 获取章节目录。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/chapterinfo
+          description: 逻辑接口名，固定为 `/book/chapterinfo`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookChapterInfoResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/chapterinfo` 章节目录响应。"
+          properties:
+            bookId:
+              type: string
+              description: 书籍 ID。
+            synckey:
+              type: integer
+              description: 同步 key 或目录版本号。
+            chapterUpdateTime:
+              type: integer
+              format: int64
+              description: 章节最后更新时间，Unix 时间戳。
+            chapters:
+              type: array
+              description: 章节数组，按目录顺序返回。
+              items:
+                $ref: '#/components/schemas/Chapter'
+
+    BookGetProgressRequest:
+      type: object
+      description: "`/book/getprogress` 获取某本书的阅读进度。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/getprogress
+          description: 逻辑接口名，固定为 `/book/getprogress`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookGetProgressResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/getprogress` 阅读进度响应。"
+          properties:
+            bookId:
+              type: string
+              description: 书籍 ID。
+            book:
+              $ref: '#/components/schemas/ReadingProgress'
+            timestamp:
+              type: integer
+              format: int64
+              description: 服务端时间戳。
+
+    ShelfSyncRequest:
+      type: object
+      description: "`/shelf/sync` 获取当前用户书架。用户身份由 API Key 自动识别。"
+      required:
+        - api_name
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /shelf/sync
+          description: 逻辑接口名，固定为 `/shelf/sync`。
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    ShelfSyncResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: |
+            `/shelf/sync` 书架响应。书架可见条目总数应按
+            `books.length + albums.length + (mp 非空 ? 1 : 0)` 计算。
+            `albums[]` 是专辑/有声书，也属于书架里的书。
+          properties:
+            books:
+              type: array
+              description: 可枚举的电子书、导入书、公众号类书籍条目数组，不含专辑和文章收藏入口。
+              items:
+                $ref: '#/components/schemas/ShelfBook'
+            albums:
+              type: array
+              description: 专辑/有声书数组，与 `books` 完全独立，但计入书架总数。
+              items:
+                $ref: '#/components/schemas/ShelfAlbum'
+            mp:
+              type: object
+              nullable: true
+              description: 文章收藏入口对象；非空时表示书架界面有 1 个文章收藏条目。
+              additionalProperties: true
+            archive:
+              type: array
+              description: 书单/归档数组。
+              items:
+                $ref: '#/components/schemas/ShelfArchive'
+            bookCount:
+              type: integer
+              description: 可枚举电子书数量，通常等于 `books.length`，不含 `albums[]` 和 `mp`。
+
+    UserNotebooksRequest:
+      type: object
+      description: "`/user/notebooks` 获取所有有笔记的书的概览。"
+      required:
+        - api_name
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /user/notebooks
+          description: 逻辑接口名，固定为 `/user/notebooks`。
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量，默认 20。
+          default: 20
+        lastSort:
+          type: integer
+          format: int64
+          description: 翻页游标；下一页取上一页 `books` 最后一项的 `sort` 值。
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    UserNotebooksResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: |
+            `/user/notebooks` 笔记本概览响应。单本书总笔记数必须按
+            `reviewCount + noteCount + bookmarkCount` 计算；`noteCount` 仅为划线数。
+          properties:
+            totalBookCount:
+              type: integer
+              description: 有笔记的书籍总数。
+            totalNoteCount:
+              type: integer
+              description: 所有书的笔记总条数，统计口径为 `reviewCount + noteCount + bookmarkCount` 汇总。
+            hasMore:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否还有更多数据，`1` 表示有。
+            books:
+              type: array
+              description: 有笔记的书籍数组。
+              items:
+                $ref: '#/components/schemas/NotebookBook'
+
+    BookBookmarkListRequest:
+      type: object
+      description: "`/book/bookmarklist` 获取单本书划线内容列表。自动过滤书签，只返回划线。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/bookmarklist
+          description: 逻辑接口名，固定为 `/book/bookmarklist`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookBookmarkListResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/bookmarklist` 单本书划线内容响应。"
+          properties:
+            updated:
+              type: array
+              description: 划线数组；该接口已过滤 type=0 的书签。
+              items:
+                $ref: '#/components/schemas/Bookmark'
+            chapters:
+              type: array
+              description: 章节信息数组，用于定位划线所属章节。
+              items:
+                $ref: '#/components/schemas/ChapterSummary'
+            book:
+              $ref: '#/components/schemas/BookSummary'
+
+    ReviewListMineRequest:
+      type: object
+      description: "`/review/list/mine` 获取当前用户在单本书上的个人想法与点评。"
+      required:
+        - api_name
+        - bookid
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /review/list/mine
+          description: 逻辑接口名，固定为 `/review/list/mine`。
+        bookid:
+          type: string
+          description: 书籍 ID。注意该接口参数名为小写 `bookid`。
+          example: "3300045871"
+        synckey:
+          type: integer
+          description: 翻页游标，默认 0。
+          default: 0
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量，默认 20。
+          default: 20
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    ReviewListMineResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/review/list/mine` 个人想法与点评响应。"
+          properties:
+            reviews:
+              type: array
+              description: 当前用户在该书上的想法/点评数组。
+              items:
+                $ref: '#/components/schemas/MineReviewItem'
+            totalCount:
+              type: integer
+              description: 总条数。
+            hasMore:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否还有更多，`1` 表示有。
+            synckey:
+              type: integer
+              description: 翻页游标，下次请求传入。
+
+    BookUnderlinesRequest:
+      type: object
+      description: "`/book/underlines` 获取某章节划线热度统计，不含划线文本。"
+      required:
+        - api_name
+        - bookId
+        - chapterUid
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/underlines
+          description: 逻辑接口名，固定为 `/book/underlines`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        chapterUid:
+          type: integer
+          description: 章节 UID，从 `/book/chapterinfo` 获取。
+          example: 107
+        synckey:
+          type: integer
+          description: 增量同步 key，默认 0。
+          default: 0
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookUnderlinesResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/underlines` 章节划线热度统计响应。"
+          properties:
+            bookId:
+              type: string
+              description: 书籍 ID。
+            chapterUid:
+              type: integer
+              description: 章节 UID。
+            underlines:
+              type: array
+              description: 划线热度统计数组，不含划线文本。
+              items:
+                $ref: '#/components/schemas/UnderlineStat'
+            synckey:
+              type: integer
+              description: 同步 key。
+
+    BookBestBookmarksRequest:
+      type: object
+      description: "`/book/bestbookmarks` 获取全书或某章节热门划线，包含划线原文和划线人数。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/bestbookmarks
+          description: 逻辑接口名，固定为 `/book/bestbookmarks`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        chapterUid:
+          type: integer
+          description: 章节 UID，`0` 表示全部章节；默认 0。
+          default: 0
+        synckey:
+          type: integer
+          description: 增量同步 key，默认 0。
+          default: 0
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookBestBookmarksResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: |
+            `/book/bestbookmarks` 热门划线响应。服务端固定返回前 20 条，
+            不支持分页。
+          properties:
+            synckey:
+              type: integer
+              description: 同步 key 或数据版本号。
+            totalCount:
+              type: integer
+              description: 热门划线总数。
+            items:
+              type: array
+              description: 热门划线数组，按热度排序。
+              items:
+                $ref: '#/components/schemas/BestBookmark'
+            chapters:
+              type: array
+              description: 章节信息数组，用于定位划线所属章节。
+              items:
+                $ref: '#/components/schemas/ChapterSummaryWithBookId'
+
+    BookReadReviewsRequest:
+      type: object
+      description: "`/book/readreviews` 查询指定划线范围下的想法/评论。"
+      required:
+        - api_name
+        - bookId
+        - chapterUid
+        - reviews
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/readreviews
+          description: 逻辑接口名，固定为 `/book/readreviews`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        chapterUid:
+          type: integer
+          description: 章节 UID。
+          example: 107
+        reviews:
+          type: array
+          minItems: 1
+          description: 要查询的划线范围数组。
+          items:
+            $ref: '#/components/schemas/ReadReviewsRangeQuery'
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookReadReviewsResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/readreviews` 划线下想法/评论响应。"
+          properties:
+            bookId:
+              type: string
+              description: 书籍 ID。
+            chapterUid:
+              type: integer
+              description: 章节 UID。
+            reviews:
+              type: array
+              description: 每个 range 的想法列表。
+              items:
+                $ref: '#/components/schemas/RangeReviews'
+
+    ReviewSingleRequest:
+      type: object
+      description: "`/review/single` 获取单条想法详情，包括富文本内容、评论/点赞分页上下文。"
+      required:
+        - api_name
+        - reviewId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /review/single
+          description: 逻辑接口名，固定为 `/review/single`。
+        reviewId:
+          type: string
+          description: 想法/评论 ID。
+          example: "123456789"
+        commentsCount:
+          type: integer
+          minimum: 0
+          description: 拉取评论数量，默认 10。
+          default: 10
+        commentsDirection:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 评论排序方向，`0`=倒序，`1`=正序。
+        likesCount:
+          type: integer
+          minimum: 0
+          description: 拉取点赞数量，默认 10。
+          default: 10
+        likesDirection:
+          type: integer
+          enum:
+            - 0
+          description: 点赞排序方向，`0`=倒序。
+        synckey:
+          type: integer
+          description: 增量同步 key，默认 0。
+          default: 0
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    ReviewSingleResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/review/single` 单条想法详情响应。"
+          properties:
+            reviewId:
+              type: string
+              description: 想法 ID。
+            review:
+              $ref: '#/components/schemas/SingleReview'
+            htmlContent:
+              type: string
+              description: 富文本 HTML 内容。
+            synckey:
+              type: integer
+              description: 同步 key。
+
+    ReviewListRequest:
+      type: object
+      description: "`/review/list` 获取书籍公开点评。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /review/list
+          description: 逻辑接口名，固定为 `/review/list`。
+        bookId:
+          type: string
+          description: 书籍 ID。
+          example: "3300045871"
+        reviewListType:
+          type: integer
+          enum:
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+          default: 0
+          description: 筛选类型，`0`=全部，`1`=推荐，`2`=不行，`3`=最新，`4`=一般。
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量，默认 20。
+          default: 20
+        maxIdx:
+          type: integer
+          minimum: 0
+          description: 翻页偏移；下一页取上一页最后一条点评的 `idx`。
+          default: 0
+        synckey:
+          type: integer
+          description: 翻页游标，默认 0。
+          default: 0
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    ReviewListResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/review/list` 书籍公开点评响应。"
+          properties:
+            synckey:
+              type: integer
+              description: 翻页游标，下次请求传入。
+            reviewsCnt:
+              type: integer
+              description: 点评总数。
+            recentTotalCnt:
+              type: integer
+              description: 最新点评数。
+            reviewsHasMore:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否有更多点评，`1` 表示有。
+            reviewsHas5Star:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否有五星推荐点评，`1` 表示有。
+            reviewsHas1Star:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否有一星差评，`1` 表示有。
+            reviewsHasRecent:
+              type: integer
+              enum:
+                - 0
+                - 1
+              description: 是否有最新点评，`1` 表示有。
+            friendCommentCount:
+              type: integer
+              description: 好友点评数。
+            friendUniqueCount:
+              type: integer
+              description: 点评好友数。
+            friendCommentUsers:
+              type: array
+              description: 点评好友信息数组。
+              items:
+                $ref: '#/components/schemas/User'
+            deepVRecommendInfo:
+              $ref: '#/components/schemas/DeepVRecommendInfo'
+            deepVRecommendValue:
+              type: integer
+              description: 资深会员推荐比例，`862` 表示 86.2%。
+              example: 862
+            deepVUniqueCount:
+              type: integer
+              description: 点评资深会员数。
+            reviews:
+              type: array
+              description: 点评数组。
+              items:
+                $ref: '#/components/schemas/PublicReviewListItem'
+
+    ReadDataDetailRequest:
+      type: object
+      description: "`/readdata/detail` 获取阅读统计详情。"
+      required:
+        - api_name
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /readdata/detail
+          description: 逻辑接口名，固定为 `/readdata/detail`。
+        mode:
+          type: string
+          enum:
+            - weekly
+            - monthly
+            - annually
+            - overall
+          default: monthly
+          description: |
+            统计维度：`weekly`=本周/自然周，`monthly`=本月/自然月，
+            `annually`=本年/自然年，`overall`=总计。
+        baseTime:
+          type: integer
+          format: int64
+          description: |
+            基准时间戳。`0` 表示当前周期，服务端会归一化到周期起点：
+            周一、月初或年初；`overall` 固定为 0。
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    ReadDataDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: |
+            `/readdata/detail` 阅读统计响应。所有阅读时长字段除特别说明外均为秒，
+            不得按分钟或小时解释。
+          properties:
+            baseTime:
+              type: integer
+              format: int64
+              description: 统计周期基准时间戳；周/月/年模式分别归一到周期起点，`overall` 为 0。
+            readTimes:
+              type: object
+              description: |
+                分桶阅读/收听总时长，key 为分桶起始时间戳，value 为秒数。
+                周/月通常按天，年按月，总计按年。
+              additionalProperties:
+                type: integer
+                description: 该分桶阅读/收听时长，单位秒。
+            dailyReadTimes:
+              type: object
+              description: 年度模式可能返回的每日阅读时长明细；用于日历明细，不应替代总量口径。
+              additionalProperties:
+                type: integer
+                description: 单日阅读/收听时长，单位秒。
+            readDays:
+              type: integer
+              description: 有效阅读天数；当前规则为单日阅读满 1 分钟。
+            totalReadTime:
+              type: integer
+              description: 当前请求周期总阅读/收听时长，单位秒；统计总时长时优先使用此字段。
+            dayAverageReadTime:
+              type: integer
+              description: 日均阅读/收听时长，单位秒；分母为自然日数，不是 `readDays`。
+            compare:
+              type: number
+              format: float
+              description: 与上一周期日均时长对比比例，`0.2` 表示约增长 20%。
+            readLongest:
+              type: array
+              description: 读得最多的书/有声内容排行，最多 10 条，低于 5 分钟的条目会被过滤。
+              items:
+                $ref: '#/components/schemas/ReadLongestItem'
+            readStat:
+              type: array
+              description: 阅读统计摘要数组，如读过、读完、阅读、笔记等。
+              items:
+                $ref: '#/components/schemas/ReadStat'
+            preferCategory:
+              type: array
+              description: 偏好阅读分类数组，最多 8 个。
+              items:
+                $ref: '#/components/schemas/PreferCategory'
+            preferCategoryWord:
+              type: string
+              description: 偏好分类文案，如 `偏好阅读文学`。
+            preferTime:
+              type: array
+              description: 24 小时阅读时段分布，值为秒数；输出顺序从 6 点到次日 5 点。
+              minItems: 24
+              maxItems: 24
+              items:
+                type: integer
+                description: 对应小时段的阅读/收听时长，单位秒。
+            preferTimeWord:
+              type: string
+              description: 偏好时段文案；总偏好时段数据不足 10 小时时可能不返回。
+            preferAuthor:
+              type: array
+              description: 偏好作者数组；只有作者数据达到展示阈值时返回。
+              items:
+                $ref: '#/components/schemas/PreferAuthor'
+            authorCount:
+              type: integer
+              description: 符合统计条件的作者总数，不一定等于 `preferAuthor` 返回条数。
+            preferPublisher:
+              type: array
+              description: 偏好出版社数组。
+              items:
+                $ref: '#/components/schemas/PreferPublisher'
+            preferCp:
+              type: array
+              description: 偏好版权方数组。
+              items:
+                $ref: '#/components/schemas/PreferCopyrightParty'
+            readRate:
+              type: number
+              format: float
+              description: 文字阅读占比百分比，约为 `wrReadTime / (wrReadTime + wrListenTime) * 100`。
+            wrReadTime:
+              type: integer
+              description: 文字阅读时长，单位秒；通常为 `totalReadTime - wrListenTime`。
+            wrListenTime:
+              type: integer
+              description: 听书/TTS/有声内容时长，单位秒。
+            rank:
+              $ref: '#/components/schemas/ReadRank'
+            registTime:
+              type: integer
+              format: int64
+              description: 用户注册时间戳。
+            medals:
+              type: array
+              description: 勋章数组；可展示勋章不少于 3 个时返回。
+              items:
+                $ref: '#/components/schemas/Medal'
+            preferBooks:
+              type: array
+              description: 偏好阅读书籍卡片数组。
+              items:
+                $ref: '#/components/schemas/PreferBook'
+            yearReport:
+              type: array
+              description: 年度报告入口数组；`times` 为该年 12 个月阅读/收听时长。
+              items:
+                $ref: '#/components/schemas/YearReport'
+            recordReadingTime:
+              type: integer
+              description: 总朗读/记录类阅读时长，单位秒，主要在 `overall` 模式汇总返回。
+            readRecordsWord:
+              type: string
+              description: 书籍分布模块标题文案，当前常见为 `书籍分布`。
+            readDistributionWord:
+              type: string
+              description: 点评分布模块标题文案，当前常见为 `点评分布`。
+            readTimeGears:
+              type: array
+              description: 阅读时长档位数组，用于前端展示分段。
+              example:
+                - 60
+                - 1800
+                - 3600
+                - 10800
+                - 18000
+              items:
+                type: integer
+                description: 档位阈值，单位秒。
+            styleType:
+              type: string
+              description: 样式类型，常见为 `normal`；年度报告场景可能返回特殊样式。
+
+    BookRecommendRequest:
+      type: object
+      description: "`/book/recommend` 获取基于用户阅读记录的个性化推荐。"
+      required:
+        - api_name
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/recommend
+          description: 逻辑接口名，固定为 `/book/recommend`。
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量，默认 12。
+          default: 12
+        maxIdx:
+          type: integer
+          minimum: 0
+          description: 翻页偏移；下一页可使用上一页最后一本书的 `searchIdx`。
+          default: 0
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookRecommendResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/recommend` 个性化推荐响应。"
+          properties:
+            books:
+              type: array
+              description: 推荐书籍数组。
+              items:
+                $ref: '#/components/schemas/RecommendedBook'
+
+    BookSimilarRequest:
+      type: object
+      description: "`/book/similar` 基于某本书推荐相似书籍。"
+      required:
+        - api_name
+        - bookId
+        - skill_version
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /book/similar
+          description: 逻辑接口名，固定为 `/book/similar`。
+        bookId:
+          type: string
+          description: 作为相似推荐种子的书籍 ID。
+          example: "3300045871"
+        count:
+          type: integer
+          minimum: 1
+          description: 每页数量，默认 12。
+          default: 12
+        maxIdx:
+          type: integer
+          minimum: 0
+          description: 翻页偏移；下一页取上一页最后一条的 `idx`。
+          default: 0
+        sessionId:
+          type: string
+          description: 翻页会话 ID；首次不传，后续传回包中的 `booksimilar.sessionId`。
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本，固定为当前版本 `1.0.3`。
+    BookSimilarResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/book/similar` 相似推荐响应。"
+          properties:
+            booksimilar:
+              $ref: '#/components/schemas/BookSimilar'
+
+    ListApisRequest:
+      type: object
+      description: "`/_list` 查看所有可用接口及参数定义。"
+      required:
+        - api_name
+      additionalProperties: false
+      properties:
+        api_name:
+          type: string
+          enum:
+            - /_list
+          description: 逻辑接口名，固定为 `/_list`。
+        skill_version:
+          type: string
+          enum:
+            - 1.0.3
+          description: 技能文档版本；该自描述接口通常可只传 `api_name`。
+    ListApisResponse:
+      allOf:
+        - $ref: '#/components/schemas/GatewayResponseMeta'
+        - type: object
+          description: "`/_list` 接口自描述响应。具体字段可能随服务端能力变化。"
+          properties:
+            apis:
+              type: array
+              description: 可用接口列表。
+              items:
+                $ref: '#/components/schemas/ApiDefinition'
+            interfaces:
+              type: object
+              description: 可用接口定义映射，key 可能为 `api_name`。
+              additionalProperties:
+                $ref: '#/components/schemas/ApiDefinition'
+          additionalProperties: true
+
+    SearchResultGroup:
+      type: object
+      description: 搜索结果分组，例如电子书、作者、书单等。
+      properties:
+        title:
+          type: string
+          description: 分组标题，如 `电子书`、`作者`。
+        scope:
+          type: integer
+          description: 分组类型，对应搜索请求的 `scope`。
+        scopeCount:
+          type: integer
+          description: 该分组总结果数。
+        currentCount:
+          type: integer
+          description: 本次返回数量。
+        books:
+          type: array
+          description: 书籍或结果数组；字段名为 books，但在不同 scope 下可能承载该 tab 的结果条目。
+          items:
+            $ref: '#/components/schemas/SearchResultBook'
+    SearchResultBook:
+      type: object
+      description: 单条搜索结果。
+      properties:
+        searchIdx:
+          type: integer
+          description: 搜索序号，用于翻页时作为下一页 `maxIdx`。
+        bookInfo:
+          $ref: '#/components/schemas/BookSummary'
+        readingCount:
+          type: integer
+          description: 在读人数。
+        newRating:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 评分，0-100 百分制。
+        newRatingCount:
+          type: integer
+          description: 评分人数。
+        newRatingDetail:
+          $ref: '#/components/schemas/RatingDetail'
+
+    BookSummary:
+      type: object
+      description: 书籍摘要信息。
+      properties:
+        bookId:
+          type: string
+          description: 书籍唯一标识。
+        title:
+          type: string
+          description: 书名。
+        author:
+          type: string
+          description: 作者。
+        translator:
+          type: string
+          description: 译者。
+        cover:
+          type: string
+          format: uri
+          description: 封面图 URL。
+        intro:
+          type: string
+          description: 书籍简介。
+        publisher:
+          type: string
+          description: 出版社。
+        category:
+          type: string
+          description: 分类。
+        publishTime:
+          type: string
+          description: 出版时间。
+        isbn:
+          type: string
+          description: ISBN。
+        wordCount:
+          type: integer
+          description: 总字数。
+        payType:
+          type: integer
+          description: 付费类型。
+        price:
+          type: integer
+          description: 价格，单位分。
+        soldout:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否下架，`1` 表示已下架。
+        type:
+          type: integer
+          description: 书籍类型，常见 `0` 表示电子书。
+        newRating:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 评分，0-100 百分制。
+        newRatingCount:
+          type: integer
+          description: 评分人数。
+        newRatingDetail:
+          $ref: '#/components/schemas/RatingDetail'
+      additionalProperties: true
+    BookDetail:
+      allOf:
+        - $ref: '#/components/schemas/BookSummary'
+        - type: object
+          description: 书籍详情响应字段。
+          properties:
+            newRatingDetail:
+              $ref: '#/components/schemas/RatingDetail'
+    RatingDetail:
+      type: object
+      description: '评分标签或评分分布详情，例如 `{ "title": "神作" }`。'
+      properties:
+        title:
+          type: string
+          description: 评分标签，如 `神作`、`力荐`。
+      additionalProperties: true
+
+    Chapter:
+      type: object
+      description: 章节目录项。
+      properties:
+        chapterUid:
+          type: integer
+          description: 章节 UID，用于章节划线热度、热门划线、章节跳转等接口。
+        chapterIdx:
+          type: integer
+          description: 章节序号。
+        title:
+          type: string
+          description: 章节标题。
+        wordCount:
+          type: integer
+          description: 章节字数。
+        level:
+          type: integer
+          description: 目录层级，`1`=一级标题，`2`=二级标题，依此类推。
+        updateTime:
+          type: integer
+          format: int64
+          description: 章节更新时间，Unix 时间戳。
+        price:
+          type: integer
+          description: 章节价格；`0` 表示免费。
+        paid:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否已购买，`1` 表示已购买。
+        isMPChapter:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否公众号章节，`1` 表示是。
+        anchors:
+          type: array
+          description: 章节内锚点或子标题数组。
+          items:
+            $ref: '#/components/schemas/ChapterAnchor'
+    ChapterAnchor:
+      type: object
+      description: 章节内锚点或子标题。服务端可能返回更多定位字段。
+      properties:
+        title:
+          type: string
+          description: 锚点/子标题名称。
+      additionalProperties: true
+    ChapterSummary:
+      type: object
+      description: 章节摘要信息。
+      properties:
+        chapterUid:
+          type: integer
+          description: 章节 UID。
+        chapterIdx:
+          type: integer
+          description: 章节序号。
+        title:
+          type: string
+          description: 章节标题。
+    ChapterSummaryWithBookId:
+      allOf:
+        - $ref: '#/components/schemas/ChapterSummary'
+        - type: object
+          properties:
+            bookId:
+              type: string
+              description: 书籍 ID。
+
+    ReadingProgress:
+      type: object
+      description: 当前书籍阅读进度。
+      properties:
+        chapterUid:
+          type: integer
+          description: 当前阅读章节 UID。
+        chapterOffset:
+          type: integer
+          description: 当前章节内偏移。
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            阅读进度百分比整数，范围 0-100。`1` 表示 1%，不是 100%；
+            只有 `100` 才代表已读完。
+        updateTime:
+          type: integer
+          format: int64
+          description: 最后阅读时间，Unix 时间戳。
+        recordReadingTime:
+          type: integer
+          description: 累计阅读时长，单位秒。
+        finishTime:
+          type: integer
+          format: int64
+          description: 读完时间，仅 `progress=100` 时存在。
+        isStartReading:
+          oneOf:
+            - type: boolean
+            - type: integer
+              enum:
+                - 0
+                - 1
+          description: 是否已开始阅读。
+
+    ShelfBook:
+      type: object
+      description: 书架中的电子书、导入书或公众号类书籍条目。
+      properties:
+        bookId:
+          type: string
+          description: 书籍唯一标识。
+        title:
+          type: string
+          description: 书名。
+        author:
+          type: string
+          description: 作者。
+        cover:
+          type: string
+          format: uri
+          description: 封面图 URL。
+        category:
+          type: string
+          description: 分类。
+        readUpdateTime:
+          type: integer
+          format: int64
+          description: 最近阅读时间，Unix 时间戳。
+        finishReading:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否读完，`1` 表示读完。
+        updateTime:
+          type: integer
+          format: int64
+          description: 书籍更新时间，Unix 时间戳。
+        isTop:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否置顶，`1` 表示置顶。
+        secret:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否私密阅读，`1` 表示私密。
+      additionalProperties: true
+    ShelfAlbum:
+      type: object
+      description: 书架中的专辑/有声书条目。
+      properties:
+        albumInfo:
+          $ref: '#/components/schemas/AlbumInfo'
+        albumInfoExtra:
+          $ref: '#/components/schemas/AlbumInfoExtra'
+    AlbumInfo:
+      type: object
+      description: 专辑/有声书基础信息。
+      properties:
+        albumId:
+          type: string
+          description: 专辑唯一标识。
+        name:
+          type: string
+          description: 专辑名称。
+        authorName:
+          type: string
+          description: 演播/作者名称。
+        cover:
+          type: string
+          format: uri
+          description: 封面图 URL。
+        trackCount:
+          type: integer
+          description: 音频集数。
+        finishStatus:
+          type: string
+          description: 完结状态文案，如 `已完结`。
+        finish:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否完结，`1` 表示完结。
+        payType:
+          type: integer
+          description: 付费类型。
+        intro:
+          type: string
+          description: 专辑简介。
+        updateTime:
+          type: integer
+          format: int64
+          description: 更新时间，Unix 时间戳。
+      additionalProperties: true
+    AlbumInfoExtra:
+      type: object
+      description: 专辑/有声书在用户书架中的扩展状态。
+      properties:
+        secret:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否私密，`1` 表示私密。
+        lecturePaid:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否已购买，`1` 表示已购买。
+        lectureReadUpdateTime:
+          type: integer
+          format: int64
+          description: 最近收听时间，Unix 时间戳。
+        isTop:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否置顶，`1` 表示置顶。
+      additionalProperties: true
+    ShelfArchive:
+      type: object
+      description: 书架书单/归档。
+      properties:
+        name:
+          type: string
+          description: 书单名称。
+        bookIds:
+          type: array
+          description: 书单内的 bookId 列表。
+          items:
+            type: string
+
+    NotebookBook:
+      type: object
+      description: 有笔记的书籍概览项。
+      properties:
+        bookId:
+          type: string
+          description: 书籍 ID。
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        reviewCount:
+          type: integer
+          description: 想法/点评数，包含划线想法、书评想法、书摘、非书籍想法等个人内容。
+        noteCount:
+          type: integer
+          description: 划线数；不是单本书总笔记数。
+        bookmarkCount:
+          type: integer
+          description: 书签数；只作为数量统计，当前不能导出书签内容。
+        readingProgress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 阅读进度百分比。
+        markedStatus:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 标记状态，`1`=读完，`0`=在读。
+        sort:
+          type: integer
+          format: int64
+          description: 排序值，通常表示最近笔记时间；用于 `lastSort` 翻页。
+    Bookmark:
+      type: object
+      description: 单条划线内容。
+      properties:
+        bookmarkId:
+          type: string
+          description: 划线唯一 ID。
+        bookId:
+          type: string
+          description: 书籍 ID。
+        chapterUid:
+          type: integer
+          description: 所在章节 UID。
+        markText:
+          type: string
+          description: 划线原文。
+        createTime:
+          type: integer
+          format: int64
+          description: 创建时间，Unix 时间戳。
+        type:
+          type: integer
+          description: 类型；本接口已过滤书签，通常只返回划线。
+          enum:
+            - 1
+        range:
+          type: string
+          description: 位置范围，格式为 `起始-结束`，例如 `900-2004`。
+          pattern: '^[0-9]+-[0-9]+$'
+        colorStyle:
+          oneOf:
+            - type: integer
+            - type: string
+          description: 划线颜色样式。
+
+    MineReviewItem:
+      type: object
+      description: 个人想法/点评列表项。
+      properties:
+        review:
+          $ref: '#/components/schemas/MineReview'
+    MineReview:
+      type: object
+      description: 当前用户在书籍中的个人内容，可为划线想法、章节点评或整本书评。
+      properties:
+        reviewId:
+          type: string
+          description: 唯一 ID。
+        content:
+          type: string
+          description: 内容文本。
+        createTime:
+          type: integer
+          format: int64
+          description: 创建时间，Unix 时间戳。
+        star:
+          type: integer
+          minimum: -1
+          maximum: 5
+          description: 评分，0-5；`-1` 表示无评分。
+        chapterName:
+          type: string
+          description: 所在章节名；章节点评时有值，整本书评可能为空。
+        isFinish:
+          oneOf:
+            - type: boolean
+            - type: integer
+              enum:
+                - 0
+                - 1
+          description: 是否读完，书评时可能有值。
+        bookId:
+          type: string
+          description: 书籍 ID；服务端返回时可用于定位。
+        chapterUid:
+          type: integer
+          description: 章节 UID；存在时可用于构造划线/想法位置链接。
+        range:
+          type: string
+          description: 关联划线的位置范围，格式为 `起始-结束`；存在时可用于定位。
+        abstract:
+          type: string
+          description: 关联划线原文摘要；划线想法可能返回。
+        author:
+          $ref: '#/components/schemas/User'
+      additionalProperties: true
+    UnderlineStat:
+      type: object
+      description: 章节内某个划线范围的热度统计。
+      properties:
+        range:
+          type: string
+          description: 划线位置范围，如 `393-401`。
+          pattern: '^[0-9]+-[0-9]+$'
+        count:
+          type: integer
+          description: 划线人数。
+        score:
+          type: number
+          format: float
+          description: 热度分数。
+        type:
+          type: integer
+          description: 划线类型。
+    BestBookmark:
+      type: object
+      description: 热门划线项。
+      properties:
+        bookId:
+          type: string
+          description: 书籍 ID。
+        userVid:
+          type: integer
+          format: int64
+          description: 代表用户 VID。
+        bookmarkId:
+          type: string
+          description: 划线唯一 ID。
+        chapterUid:
+          type: integer
+          description: 所在章节 UID。
+        range:
+          type: string
+          description: 划线位置范围，如 `393-401`。
+          pattern: '^[0-9]+-[0-9]+$'
+        markText:
+          type: string
+          description: 划线原文文本。
+        totalCount:
+          type: integer
+          description: 划线人数。
+        simplifiedRange:
+          type: string
+          description: 简体书籍的 range，繁简体书专属。
+        traditionalRange:
+          type: string
+          description: 繁体书籍的 range，繁简体书专属。
+    ReadReviewsRangeQuery:
+      type: object
+      description: 要查询想法/评论的划线范围。
+      required:
+        - range
+      additionalProperties: false
+      properties:
+        range:
+          type: string
+          description: 划线位置范围，从 `/book/bestbookmarks` 获取。
+          pattern: '^[0-9]+-[0-9]+$'
+          example: 900-2004
+        maxIdx:
+          type: integer
+          minimum: 0
+          description: 翻页偏移，默认 0。
+          default: 0
+        count:
+          type: integer
+          minimum: 1
+          maximum: 20
+          description: 每页数量，服务端上限 20，超过会自动截断。
+          default: 20
+        synckey:
+          type: integer
+          description: 翻页游标，默认 0。
+          default: 0
+    RangeReviews:
+      type: object
+      description: 某个划线范围下的想法列表。
+      properties:
+        range:
+          type: string
+          description: 划线范围。
+          pattern: '^[0-9]+-[0-9]+$'
+        totalCount:
+          type: integer
+          description: 该范围下想法总数。
+        hasMore:
+          type: integer
+          enum:
+            - 0
+            - 1
+          description: 是否还有更多，`1` 表示有。
+        maxIdx:
+          type: integer
+          description: 翻页偏移。
+        synckey:
+          type: integer
+          description: 翻页游标。
+        pageReviews:
+          type: array
+          description: 想法数组。
+          items:
+            $ref: '#/components/schemas/PageReview'
+    PageReview:
+      type: object
+      description: 划线下的一条想法。
+      properties:
+        reviewId:
+          type: string
+          description: 想法 ID。
+        review:
+          $ref: '#/components/schemas/ReadReviewDetail'
+    ReadReviewDetail:
+      type: object
+      description: 划线下想法详情对象。
+      properties:
+        abstract:
+          type: string
+          description: 划线原文，想法对应的划线内容。
+        content:
+          type: string
+          description: 想法内容。
+        range:
+          type: string
+          description: 划线位置范围。
+          pattern: '^[0-9]+-[0-9]+$'
+        createTime:
+          type: integer
+          format: int64
+          description: 创建时间，Unix 时间戳。
+        author:
+          $ref: '#/components/schemas/User'
+      additionalProperties: true
+
+    SingleReview:
+      type: object
+      description: 单条想法详情对象。
+      properties:
+        reviewId:
+          type: string
+          description: 想法 ID。
+        content:
+          type: string
+          description: 内容文本。
+        bookId:
+          type: string
+          description: 书籍 ID。
+        chapterUid:
+          type: integer
+          description: 章节 UID。
+        range:
+          type: string
+          description: 关联划线位置范围，存在时可用于定位。
+        createTime:
+          type: integer
+          format: int64
+          description: 创建时间，Unix 时间戳。
+        author:
+          $ref: '#/components/schemas/User'
+      additionalProperties: true
+    PublicReviewListItem:
+      type: object
+      description: 公开点评列表项。
+      properties:
+        idx:
+          type: integer
+          description: 序号，用于翻页时作为下一页 `maxIdx`。
+        review:
+          $ref: '#/components/schemas/PublicReviewEnvelope'
+    PublicReviewEnvelope:
+      type: object
+      description: 公开点评包装对象。
+      properties:
+        reviewId:
+          type: string
+          description: 点评唯一 ID。
+        review:
+          $ref: '#/components/schemas/PublicReview'
+    PublicReview:
+      type: object
+      description: 书籍公开点评详情。
+      properties:
+        content:
+          type: string
+          description: 点评文本内容。
+        htmlContent:
+          type: string
+          description: 点评 HTML 富文本内容。
+        star:
+          type: integer
+          enum:
+            - 20
+            - 40
+            - 60
+            - 80
+            - 100
+          description: 评分，`20`=一星，`40`=二星，`60`=三星，`80`=四星，`100`=五星。
+        isFinish:
+          oneOf:
+            - type: boolean
+            - type: integer
+              enum:
+                - 0
+                - 1
+          description: 是否读完此书。
+        createTime:
+          type: integer
+          format: int64
+          description: 创建时间，Unix 时间戳。
+        chapterName:
+          type: string
+          description: 所在章节名；章节点评时有值。
+        author:
+          $ref: '#/components/schemas/User'
+        book:
+          $ref: '#/components/schemas/BookSummary'
+      additionalProperties: true
+    User:
+      type: object
+      description: 用户信息。
+      properties:
+        userVid:
+          type: integer
+          format: int64
+          description: 用户 VID。
+        name:
+          type: string
+          description: 用户昵称。
+        avatar:
+          type: string
+          format: uri
+          description: 用户头像 URL。
+      additionalProperties: true
+    DeepVRecommendInfo:
+      type: object
+      description: 资深会员推荐摘要。
+      properties:
+        title:
+          type: string
+          description: 标题，如 `2337 个资深会员点评`。
+        subtitle:
+          type: string
+          description: 副标题，如 `其中 2015 人(86.2%)推荐本书`。
+
+    ReadLongestItem:
+      type: object
+      description: 阅读/收听时长排行项。
+      properties:
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        albumInfo:
+          $ref: '#/components/schemas/AlbumInfo'
+        readTime:
+          type: integer
+          description: 该书或有声内容在当前统计范围内的阅读/收听时长，单位秒。
+        recordReadingTime:
+          type: integer
+          description: 该书的朗读/记录类阅读时长，单位秒。
+        tags:
+          type: array
+          description: 标签数组，常见值包括 `笔记最多`、`单日阅读最久`。
+          items:
+            type: string
+    ReadStat:
+      type: object
+      description: 阅读统计摘要项。
+      properties:
+        stat:
+          type: string
+          description: 统计项名称，常见为 `读过`、`读完`、`阅读`、`笔记`。
+        counts:
+          type: string
+          description: 统计值文案，如 `12本`、`45天`、`120条`。
+        scheme:
+          type: string
+          description: 对应统计项的 App 跳转链接，可能为空。
+    PreferCategory:
+      type: object
+      description: 偏好阅读分类。
+      properties:
+        categoryId:
+          type: integer
+          description: 分类 ID。
+        categoryTitle:
+          type: string
+          description: 分类名称。
+        parentCategoryId:
+          type: integer
+          description: 父分类 ID。
+        parentCategoryTitle:
+          type: string
+          description: 父分类名称。
+        val:
+          type: number
+          format: float
+          description: 分类偏好权重，按最高分类阅读时长归一化后的相对值。
+        readingTime:
+          type: integer
+          description: 该分类阅读时长，单位秒。
+        readingCount:
+          type: integer
+          description: 该分类阅读本数。
+        categoryType:
+          type: integer
+          description: 分类类型标记，普通分类为 0，部分特殊分类可能返回 1 或 2。
+    PreferAuthor:
+      type: object
+      description: 偏好作者。
+      properties:
+        authorId:
+          type: string
+          description: 作者 ID。
+        name:
+          type: string
+          description: 作者名。
+        count:
+          type: integer
+          description: 阅读该作者的书本数。
+        readTime:
+          type: string
+          description: 阅读该作者作品的时长，格式化字符串，如 `5小时30分钟`，不是秒数。
+        user:
+          $ref: '#/components/schemas/User'
+    PreferPublisher:
+      type: object
+      description: 偏好出版社。
+      properties:
+        name:
+          type: string
+          description: 出版社名。
+        count:
+          type: integer
+          description: 阅读该出版社书籍的本数。
+    PreferCopyrightParty:
+      type: object
+      description: 偏好版权方。
+      properties:
+        count:
+          type: integer
+          description: 阅读该版权方书籍的本数。
+        copyrightInfo:
+          $ref: '#/components/schemas/CopyrightInfo'
+    CopyrightInfo:
+      type: object
+      description: 版权方信息。
+      properties:
+        name:
+          type: string
+          description: 版权方名称。
+        userVid:
+          type: integer
+          format: int64
+          description: 版权方用户 VID。
+        avatar:
+          type: string
+          format: uri
+          description: 头像 URL。
+        role:
+          type: string
+          description: 版权方角色。
+      additionalProperties: true
+    ReadRank:
+      type: object
+      description: 本周好友阅读排行信息，仅当前周且未隐藏排行时返回。
+      properties:
+        text:
+          type: string
+          description: 排行文案，如 `朋友中排第3名`。
+        scheme:
+          type: string
+          description: 排行跳转链接。
+    Medal:
+      type: object
+      description: 勋章信息。具体字段随活动配置变化。
+      properties:
+        title:
+          type: string
+          description: 勋章标题。
+        name:
+          type: string
+          description: 勋章名称。
+        icon:
+          type: string
+          format: uri
+          description: 勋章图标 URL。
+      additionalProperties: true
+    PreferBook:
+      type: object
+      description: 偏好阅读书籍卡片。
+      properties:
+        book:
+          $ref: '#/components/schemas/BookSummary'
+        reason:
+          type: string
+          description: 推荐理由或偏好说明。
+        type:
+          type: string
+          description: 偏好类型。
+      additionalProperties: true
+    YearReport:
+      type: object
+      description: 年度报告入口。
+      properties:
+        year:
+          type: integer
+          description: 年份。
+        scheme:
+          type: string
+          description: 年报跳转链接。
+        times:
+          type: array
+          description: 该年 12 个月阅读/收听时长数组，单位秒。
+          items:
+            type: integer
+      additionalProperties: true
+
+    RecommendedBook:
+      allOf:
+        - $ref: '#/components/schemas/BookSummary'
+        - type: object
+          description: 个性化推荐书籍。
+          properties:
+            reason:
+              type: string
+              description: 推荐理由。
+            readingCount:
+              type: integer
+              description: 在读人数。
+            searchIdx:
+              type: integer
+              description: 结果序号，用于翻页。
+    BookSimilar:
+      type: object
+      description: 相似书推荐结果。
+      properties:
+        sessionId:
+          type: string
+          description: 会话 ID，翻页时传入下一次请求。
+        books:
+          type: array
+          description: 推荐书籍数组。
+          items:
+            $ref: '#/components/schemas/SimilarBookItem'
+    SimilarBookItem:
+      type: object
+      description: 相似推荐列表项。
+      properties:
+        idx:
+          type: integer
+          description: 结果序号，下次请求 `maxIdx` 传最后一条的 idx。
+        book:
+          type: object
+          description: 书籍包装对象。
+          properties:
+            bookInfo:
+              $ref: '#/components/schemas/BookSummary'
+          additionalProperties: true
+
+    ApiDefinition:
+      type: object
+      description: 网关自描述接口定义。
+      properties:
+        api_name:
+          type: string
+          description: 逻辑接口名。
+        description:
+          type: string
+          description: 接口说明。
+        params:
+          type: array
+          description: 参数定义数组。
+          items:
+            $ref: '#/components/schemas/ApiParameterDefinition'
+      additionalProperties: true
+    ApiParameterDefinition:
+      type: object
+      description: 接口参数定义。
+      properties:
+        name:
+          type: string
+          description: 参数名。
+        type:
+          type: string
+          description: 参数类型。
+        required:
+          type: boolean
+          description: 是否必填。
+        description:
+          type: string
+          description: 参数说明。
+      additionalProperties: true

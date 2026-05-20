@@ -1,0 +1,767 @@
+openapi: 3.0.3
+info:
+  title: 彩云天气 API
+  description: 彩云天气 v2.6 天气数据接口
+  version: "2.6"
+  contact:
+    url: https://docs.caiyunapp.com/weather-api/v2/v2.6/
+servers:
+  - url: https://api.caiyunapp.com
+
+paths:
+  /v2.6/{token}/{location}/realtime.json:
+    get:
+      operationId: getRealtime
+      summary: 实况数据
+      description: 获取指定位置的实时天气数据
+      parameters:
+        - $ref: "#/components/parameters/token"
+        - $ref: "#/components/parameters/location"
+        - $ref: "#/components/parameters/lang"
+        - $ref: "#/components/parameters/unit"
+        - name: alert
+          in: query
+          description: 是否返回预警信息
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RealtimeResponse"
+
+  /v2.6/{token}/{location}/minutely.json:
+    get:
+      operationId: getMinutely
+      summary: 分钟级别降水
+      description: 获取指定位置未来 2 小时的分钟级别降水预报
+      parameters:
+        - $ref: "#/components/parameters/token"
+        - $ref: "#/components/parameters/location"
+        - $ref: "#/components/parameters/lang"
+        - $ref: "#/components/parameters/unit"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MinutelyResponse"
+
+  /v2.6/{token}/{location}/hourly.json:
+    get:
+      operationId: getHourly
+      summary: 小时级别预报
+      description: 获取指定位置的小时级别天气预报
+      parameters:
+        - $ref: "#/components/parameters/token"
+        - $ref: "#/components/parameters/location"
+        - $ref: "#/components/parameters/lang"
+        - $ref: "#/components/parameters/unit"
+        - name: hourlysteps
+          in: query
+          description: 预报小时数，取值 1-360，默认 48
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 360
+            default: 48
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HourlyResponse"
+
+  /v2.6/{token}/{location}/daily.json:
+    get:
+      operationId: getDaily
+      summary: 天级别预报
+      description: 获取指定位置的天级别天气预报
+      parameters:
+        - $ref: "#/components/parameters/token"
+        - $ref: "#/components/parameters/location"
+        - $ref: "#/components/parameters/lang"
+        - $ref: "#/components/parameters/unit"
+        - name: dailysteps
+          in: query
+          description: 预报天数，取值 1-15，默认 5
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 15
+            default: 5
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyResponse"
+
+components:
+  parameters:
+    token:
+      name: token
+      in: path
+      required: true
+      description: API 访问令牌
+      schema:
+        type: string
+    location:
+      name: location
+      in: path
+      required: true
+      description: 经纬度，格式为 `{longitude},{latitude}`，如 `116.4073,39.9042`
+      schema:
+        type: string
+        example: "116.4073,39.9042"
+    lang:
+      name: lang
+      in: query
+      description: 返回语言
+      schema:
+        type: string
+        enum:
+          - zh_CN
+          - zh_TW
+          - en_US
+          - en_GB
+          - ja
+        default: zh_CN
+    unit:
+      name: unit
+      in: query
+      description: 单位制
+      schema:
+        type: string
+        enum:
+          - metric
+          - imperial
+          - si
+        default: metric
+
+  schemas:
+    BaseResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: 请求状态，`ok` 为成功
+          example: ok
+        api_version:
+          type: string
+          description: API 版本号
+          example: v2.6
+        api_status:
+          type: string
+          description: API 服务状态
+          example: active
+        lang:
+          type: string
+          description: 返回语言
+          example: zh_CN
+        unit:
+          type: string
+          description: 单位制
+          example: metric
+        tzshift:
+          type: integer
+          description: 时区偏移，单位秒
+          example: 28800
+        timezone:
+          type: string
+          description: 时区名称
+          example: Asia/Shanghai
+        server_time:
+          type: integer
+          description: 服务器时间，Unix 时间戳（秒）
+          example: 1716195600
+        location:
+          type: array
+          description: 请求的经纬度 [longitude, latitude]
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          example: [116.4073, 39.9042]
+
+    Skycon:
+      type: string
+      description: 天气现象
+      enum:
+        - CLEAR_DAY
+        - CLEAR_NIGHT
+        - PARTLY_CLOUDY_DAY
+        - PARTLY_CLOUDY_NIGHT
+        - CLOUDY
+        - LIGHT_HAZE
+        - MODERATE_HAZE
+        - HEAVY_HAZE
+        - LIGHT_RAIN
+        - MODERATE_RAIN
+        - HEAVY_RAIN
+        - STORM_RAIN
+        - FOG
+        - LIGHT_SNOW
+        - MODERATE_SNOW
+        - HEAVY_SNOW
+        - STORM_SNOW
+        - DUST
+        - SAND
+        - WIND
+
+    Wind:
+      type: object
+      properties:
+        speed:
+          type: number
+          description: 风速，单位 km/h（metric）
+        direction:
+          type: number
+          description: 风向，单位度，0 为北，顺时针
+
+    AQI:
+      type: object
+      properties:
+        chn:
+          type: integer
+          description: 国标 AQI
+        usa:
+          type: integer
+          description: 美标 AQI
+
+    AirQuality:
+      type: object
+      properties:
+        pm25:
+          type: number
+          description: PM2.5 浓度，单位 μg/m³
+        pm10:
+          type: number
+          description: PM10 浓度，单位 μg/m³
+        o3:
+          type: number
+          description: 臭氧浓度，单位 μg/m³
+        so2:
+          type: number
+          description: 二氧化硫浓度，单位 μg/m³
+        no2:
+          type: number
+          description: 二氧化氮浓度，单位 μg/m³
+        co:
+          type: number
+          description: 一氧化碳浓度，单位 mg/m³
+        aqi:
+          $ref: "#/components/schemas/AQI"
+        description:
+          type: object
+          properties:
+            chn:
+              type: string
+              description: 国标 AQI 描述
+            usa:
+              type: string
+              description: 美标 AQI 描述
+
+    LifeIndexItem:
+      type: object
+      properties:
+        index:
+          type: string
+          description: 指数等级
+        desc:
+          type: string
+          description: 指数描述
+
+    RealtimePrecipitation:
+      type: object
+      properties:
+        local:
+          type: object
+          properties:
+            status:
+              type: string
+            datasource:
+              type: string
+            intensity:
+              type: number
+              description: 本地降水强度，单位 mm/h
+        nearest:
+          type: object
+          properties:
+            status:
+              type: string
+            distance:
+              type: number
+              description: 最近降水带距离，单位 km
+            intensity:
+              type: number
+              description: 最近降水带强度，单位 mm/h
+
+    Realtime:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        temperature:
+          type: number
+          description: 气温，单位 °C（metric）
+        humidity:
+          type: number
+          description: 相对湿度，0.0～1.0
+        cloudrate:
+          type: number
+          description: 云量，0.0～1.0
+        skycon:
+          $ref: "#/components/schemas/Skycon"
+        visibility:
+          type: number
+          description: 能见度，单位 km
+        dswrf:
+          type: number
+          description: 向下短波辐射通量，单位 W/M²
+        wind:
+          $ref: "#/components/schemas/Wind"
+        pressure:
+          type: number
+          description: 气压，单位 Pa
+        apparent_temperature:
+          type: number
+          description: 体感温度，单位 °C（metric）
+        precipitation:
+          $ref: "#/components/schemas/RealtimePrecipitation"
+        air_quality:
+          $ref: "#/components/schemas/AirQuality"
+        life_index:
+          type: object
+          properties:
+            ultraviolet:
+              $ref: "#/components/schemas/LifeIndexItem"
+            comfort:
+              $ref: "#/components/schemas/LifeIndexItem"
+
+    RealtimeResponse:
+      allOf:
+        - $ref: "#/components/schemas/BaseResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                realtime:
+                  $ref: "#/components/schemas/Realtime"
+
+    Minutely:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        datasource:
+          type: string
+          description: 数据来源
+          example: radar
+        precipitation_2h:
+          type: array
+          description: 未来 2 小时每分钟降水强度，共 120 个值，单位 mm/h
+          items:
+            type: number
+          minItems: 120
+          maxItems: 120
+        precipitation:
+          type: array
+          description: 未来 30 分钟每分钟降水强度，单位 mm/h
+          items:
+            type: number
+          minItems: 30
+          maxItems: 30
+        probability:
+          type: array
+          description: 未来 2 小时降水概率，共 4 个值（每 30 分钟一个），0.0～1.0
+          items:
+            type: number
+          minItems: 4
+          maxItems: 4
+        description:
+          type: string
+          description: 分钟级预报自然语言描述
+          example: 未来两小时无降水
+
+    MinutelyResponse:
+      allOf:
+        - $ref: "#/components/schemas/BaseResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                minutely:
+                  $ref: "#/components/schemas/Minutely"
+
+    HourlyDataPoint:
+      type: object
+      properties:
+        datetime:
+          type: string
+          format: date-time
+          description: 数据时间，ISO 8601 格式
+          example: "2026-05-20T10:00+08:00"
+        value:
+          type: number
+
+    HourlySkyconPoint:
+      type: object
+      properties:
+        datetime:
+          type: string
+          format: date-time
+          description: 数据时间，ISO 8601 格式
+        value:
+          $ref: "#/components/schemas/Skycon"
+
+    HourlyWindPoint:
+      type: object
+      properties:
+        datetime:
+          type: string
+          format: date-time
+        speed:
+          type: number
+          description: 风速，单位 km/h（metric）
+        direction:
+          type: number
+          description: 风向，单位度
+
+    HourlyAirQualityPoint:
+      type: object
+      properties:
+        datetime:
+          type: string
+          format: date-time
+        pm25:
+          type: number
+        pm10:
+          type: number
+        o3:
+          type: number
+        so2:
+          type: number
+        no2:
+          type: number
+        co:
+          type: number
+        aqi:
+          $ref: "#/components/schemas/AQI"
+
+    Hourly:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        description:
+          type: string
+          description: 小时级预报自然语言描述
+        precipitation:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 降水强度，单位 mm/h
+        temperature:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 气温，单位 °C（metric）
+        apparent_temperature:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 体感温度，单位 °C（metric）
+        wind:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyWindPoint"
+          description: 风速风向
+        humidity:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 相对湿度，0.0～1.0
+        cloudrate:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 云量，0.0～1.0
+        skycon:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlySkyconPoint"
+          description: 天气现象
+        pressure:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 气压，单位 Pa
+        visibility:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 能见度，单位 km
+        dswrf:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyDataPoint"
+          description: 向下短波辐射通量，单位 W/M²
+        air_quality:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyAirQualityPoint"
+
+    HourlyResponse:
+      allOf:
+        - $ref: "#/components/schemas/BaseResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                hourly:
+                  $ref: "#/components/schemas/Hourly"
+
+    DailyDataRange:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日期，ISO 8601 格式
+          example: "2026-05-20"
+        max:
+          type: number
+        min:
+          type: number
+        avg:
+          type: number
+
+    DailySkyconPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日期，ISO 8601 格式
+        value:
+          $ref: "#/components/schemas/Skycon"
+
+    DailyWindRange:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        max:
+          $ref: "#/components/schemas/Wind"
+        min:
+          $ref: "#/components/schemas/Wind"
+        avg:
+          $ref: "#/components/schemas/Wind"
+
+    DailyAstro:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        sunrise:
+          type: object
+          properties:
+            time:
+              type: string
+              description: 日出时间，格式 HH:mm
+              example: "05:14"
+        sunset:
+          type: object
+          properties:
+            time:
+              type: string
+              description: 日落时间，格式 HH:mm
+              example: "19:47"
+
+    DailyLifeIndex:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        index:
+          type: string
+          description: 指数等级
+        desc:
+          type: string
+          description: 指数描述
+
+    DailyAirQuality:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        max:
+          $ref: "#/components/schemas/AQI"
+        min:
+          $ref: "#/components/schemas/AQI"
+        avg:
+          $ref: "#/components/schemas/AQI"
+
+    Daily:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        astro:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyAstro"
+          description: 日出日落时间
+        precipitation_08h_20h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 白天（08:00-20:00）降水强度，单位 mm/h
+        precipitation_20h_32h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 夜间（20:00-08:00）降水强度，单位 mm/h
+        precipitation:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 全天降水强度，单位 mm/h
+        temperature:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 气温，单位 °C（metric）
+        temperature_08h_20h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 白天气温，单位 °C（metric）
+        temperature_20h_32h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 夜间气温，单位 °C（metric）
+        wind:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyWindRange"
+          description: 风速风向
+        wind_08h_20h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyWindRange"
+          description: 白天风速风向
+        wind_20h_32h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyWindRange"
+          description: 夜间风速风向
+        humidity:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 相对湿度，0.0～1.0
+        cloudrate:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 云量，0.0～1.0
+        pressure:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 气压，单位 Pa
+        visibility:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 能见度，单位 km
+        dswrf:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyDataRange"
+          description: 向下短波辐射通量，单位 W/M²
+        skycon:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySkyconPoint"
+          description: 全天天气现象
+        skycon_08h_20h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySkyconPoint"
+          description: 白天天气现象
+        skycon_20h_32h:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySkyconPoint"
+          description: 夜间天气现象
+        air_quality:
+          type: object
+          properties:
+            aqi:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyAirQuality"
+            pm25:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyDataRange"
+        life_index:
+          type: object
+          properties:
+            ultraviolet:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyLifeIndex"
+              description: 紫外线指数
+            carWashing:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyLifeIndex"
+              description: 洗车指数
+            dressing:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyLifeIndex"
+              description: 穿衣指数
+            comfort:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyLifeIndex"
+              description: 舒适度指数
+            coldRisk:
+              type: array
+              items:
+                $ref: "#/components/schemas/DailyLifeIndex"
+              description: 感冒指数
+
+    DailyResponse:
+      allOf:
+        - $ref: "#/components/schemas/BaseResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                daily:
+                  $ref: "#/components/schemas/Daily"
