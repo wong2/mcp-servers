@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler, WorkerTransport } from "agents/mcp";
 import { z } from "zod";
+import YahooFinance from "yahoo-finance2";
 
 const SKILL_VERSION = "1.0.3";
 const WEREAD_GATEWAY_URL = "https://i.weread.qq.com/api/agent/gateway";
@@ -565,6 +566,152 @@ function createTwelveDataServer(apiKey: string): McpServer {
   return server;
 }
 
+const QUOTE_SUMMARY_MODULES = [
+  "assetProfile",
+  "balanceSheetHistory",
+  "balanceSheetHistoryQuarterly",
+  "calendarEvents",
+  "cashflowStatementHistory",
+  "cashflowStatementHistoryQuarterly",
+  "defaultKeyStatistics",
+  "earnings",
+  "earningsHistory",
+  "earningsTrend",
+  "financialData",
+  "fundOwnership",
+  "fundPerformance",
+  "fundProfile",
+  "incomeStatementHistory",
+  "incomeStatementHistoryQuarterly",
+  "indexTrend",
+  "industryTrend",
+  "insiderHolders",
+  "insiderTransactions",
+  "institutionOwnership",
+  "majorDirectHolders",
+  "majorHoldersBreakdown",
+  "netSharePurchaseActivity",
+  "price",
+  "quoteType",
+  "recommendationTrend",
+  "secFilings",
+  "sectorTrend",
+  "summaryDetail",
+  "summaryProfile",
+  "topHoldings",
+  "upgradeDowngradeHistory",
+] as const;
+
+let yahooFinanceInstance: InstanceType<typeof YahooFinance> | undefined;
+
+function getYahooFinance(): InstanceType<typeof YahooFinance> {
+  if (!yahooFinanceInstance) {
+    yahooFinanceInstance = new YahooFinance({
+      versionCheck: false,
+      suppressNotices: ["yahooSurvey", "ripHistorical"],
+      validation: { logErrors: false, logOptionsErrors: false },
+    });
+  }
+
+  return yahooFinanceInstance;
+}
+
+function createYahooFinanceServer(): McpServer {
+  const server = new McpServer({
+    name: "yahoo-finance-mcp",
+    version: "1.0.0",
+  });
+
+  const yf = getYahooFinance();
+  // Pass back Yahoo's raw response without schema validation so the server stays
+  // resilient to Yahoo's frequent schema changes.
+  const passthrough = { validateResult: false } as const;
+
+  const ticker = z.string().min(1).describe("Yahoo Finance ticker symbol, e.g. AAPL, BTC-USD, EURUSD=X, ^GSPC.");
+  const chartInterval = z
+    .enum(["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"])
+    .optional()
+    .describe("Candle interval, default 1d. Intraday intervals only support recent date ranges.");
+
+  server.tool(
+    "get_quote",
+    "Get real-time (or near real-time) quote data for one or more symbols, including price, change, OHLC, volume, market cap, 52-week range and more.",
+    {
+      symbols: z.array(z.string().min(1)).min(1).describe("One or more ticker symbols to quote, e.g. ['AAPL', 'MSFT']."),
+    },
+    async ({ symbols }) => jsonText(await yf.quote(symbols, undefined, passthrough)),
+  );
+
+  server.tool(
+    "search",
+    "Search for instruments and related news by name, ticker or keyword. Returns matching quotes (symbol, name, exchange, type) and news articles.",
+    {
+      query: z.string().min(1).describe("Search keyword, e.g. a company name or ticker."),
+      quotesCount: z.number().int().min(0).max(50).optional().describe("Max number of matching instruments to return, default 6."),
+      newsCount: z.number().int().min(0).max(50).optional().describe("Max number of related news articles to return, default 4."),
+      lang: z.string().optional().describe("Language code, e.g. en-US."),
+      region: z.string().optional().describe("Region code, e.g. US."),
+    },
+    async ({ query, quotesCount, newsCount, lang, region }) =>
+      jsonText(
+        await yf.search(
+          query,
+          {
+            ...(quotesCount !== undefined && { quotesCount }),
+            ...(newsCount !== undefined && { newsCount }),
+            ...(lang !== undefined && { lang }),
+            ...(region !== undefined && { region }),
+          },
+          passthrough,
+        ),
+      ),
+  );
+
+  server.tool(
+    "get_chart",
+    "Get historical OHLCV price data (and optionally dividend/split events) for a symbol over a date range.",
+    {
+      symbol: ticker,
+      period1: z.string().min(1).describe("Start of the range, e.g. 2024-01-01 or an ISO datetime."),
+      period2: z.string().optional().describe("End of the range, e.g. 2024-12-31 or an ISO datetime; defaults to now."),
+      interval: chartInterval,
+      events: z.string().optional().describe("Events to include, pipe-separated, e.g. 'div|split'."),
+      includePrePost: z.boolean().optional().describe("Whether to include pre/post-market data, default false."),
+    },
+    async ({ symbol, period1, period2, interval, events, includePrePost }) =>
+      jsonText(
+        await yf.chart(
+          symbol,
+          {
+            period1,
+            ...(period2 !== undefined && { period2 }),
+            ...(interval !== undefined && { interval }),
+            ...(events !== undefined && { events }),
+            ...(includePrePost !== undefined && { includePrePost }),
+          },
+          passthrough,
+        ),
+      ),
+  );
+
+  server.tool(
+    "quote_summary",
+    "Get detailed fundamental and financial data for a symbol via Yahoo's quoteSummary modules (profile, financials, statistics, holders, etc.).",
+    {
+      symbol: ticker,
+      modules: z
+        .array(z.enum(QUOTE_SUMMARY_MODULES))
+        .min(1)
+        .optional()
+        .describe("Modules to include; omit for default (price + summaryDetail). Note: financial-statement modules now return little data — prefer financialData / defaultKeyStatistics."),
+    },
+    async ({ symbol, modules }) =>
+      jsonText(await yf.quoteSummary(symbol, { ...(modules !== undefined && { modules }) }, passthrough)),
+  );
+
+  return server;
+}
+
 function createHandler(server: McpServer, route: string) {
   const transport = new WorkerTransport({
     corsOptions: {
@@ -596,6 +743,10 @@ function healthResponse(): Response {
         twelvedata: {
           mcp: "/twelvedata/mcp",
           auth: "Authorization: Bearer <twelvedata-api-token>",
+        },
+        "yahoo-finance": {
+          mcp: "/yahoo-finance/mcp",
+          auth: "none",
         },
       },
     }),
@@ -647,8 +798,12 @@ export default {
       return createHandler(createTwelveDataServer(bearerToken), "/twelvedata/mcp")(request, env, ctx);
     }
 
+    if (url.pathname === "/yahoo-finance/mcp") {
+      return createHandler(createYahooFinanceServer(), "/yahoo-finance/mcp")(request, env, ctx);
+    }
+
     return notFound();
   },
 } satisfies ExportedHandler<Env>;
 
-export { createCaiyunServer, createTwelveDataServer, createWeReadServer };
+export { createCaiyunServer, createTwelveDataServer, createWeReadServer, createYahooFinanceServer };
