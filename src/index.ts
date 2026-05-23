@@ -5,6 +5,7 @@ import { z } from "zod";
 const SKILL_VERSION = "1.0.3";
 const WEREAD_GATEWAY_URL = "https://i.weread.qq.com/api/agent/gateway";
 const CAIYUN_API_BASE_URL = "https://api.caiyunapp.com";
+const TWELVEDATA_API_BASE_URL = "https://api.twelvedata.com";
 
 type Env = Record<string, never>;
 
@@ -422,6 +423,148 @@ function createCaiyunServer(token: string): McpServer {
   return server;
 }
 
+async function callTwelveData(
+  apiKey: string,
+  endpoint: string,
+  query: Record<string, string | number | boolean | undefined>,
+): Promise<unknown> {
+  const url = new URL(`${TWELVEDATA_API_BASE_URL}/${endpoint}`);
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  url.searchParams.set("apikey", apiKey);
+
+  const response = await fetch(url);
+  const bodyText = await response.text();
+  let body: unknown = bodyText;
+
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    // Keep raw text for non-JSON upstream failures.
+  }
+
+  if (!response.ok) {
+    throw new Error(`Twelve Data returned HTTP ${response.status}: ${bodyText}`);
+  }
+
+  return body;
+}
+
+function createTwelveDataServer(apiKey: string): McpServer {
+  const server = new McpServer({
+    name: "twelvedata-mcp",
+    version: "1.0.0",
+  });
+
+  const symbol = z.string().min(1).describe("Instrument ticker symbol, e.g. AAPL, EUR/USD, BTC/USD.");
+  const exchange = z.string().optional().describe("Exchange name, e.g. NASDAQ; used to disambiguate identical tickers.");
+  const micCode = z.string().optional().describe("ISO 10383 Market Identifier Code (MIC), e.g. XNAS.");
+  const country = z.string().optional().describe("Country of trade, e.g. United States or US.");
+  const dp = z.number().int().min(0).max(11).optional().describe("Number of decimal places for floats, 0-11, default 5.");
+  const prepost = z.boolean().optional().describe("Whether to include pre/post-market data (requires Pro+ plan), default false.");
+
+  server.tool(
+    "twelvedata_get_quote",
+    "Get a real-time quote for an instrument, including OHLC, volume, change, 52-week high/low and more.",
+    {
+      symbol,
+      interval: z
+        .enum(["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "8h", "1day", "1week", "1month"])
+        .optional()
+        .describe("Quote interval, default 1day."),
+      exchange,
+      mic_code: micCode,
+      country,
+      prepost,
+      eod: z.boolean().optional().describe("Whether to return closed-day data, default false."),
+      dp,
+      timezone: z.string().optional().describe("Output timezone, e.g. Exchange, UTC or America/New_York, default Exchange."),
+    },
+    async ({ symbol, interval, exchange, mic_code, country, prepost, eod, dp, timezone }) =>
+      jsonText(
+        await callTwelveData(apiKey, "quote", {
+          symbol,
+          interval,
+          exchange,
+          mic_code,
+          country,
+          prepost,
+          eod,
+          dp,
+          timezone,
+        }),
+      ),
+  );
+
+  server.tool(
+    "twelvedata_get_latest_price",
+    "Get the latest real-time price for an instrument; returns the current price only.",
+    {
+      symbol,
+      exchange,
+      mic_code: micCode,
+      country,
+      prepost,
+      dp,
+    },
+    async ({ symbol, exchange, mic_code, country, prepost, dp }) =>
+      jsonText(
+        await callTwelveData(apiKey, "price", {
+          symbol,
+          exchange,
+          mic_code,
+          country,
+          prepost,
+          dp,
+        }),
+      ),
+  );
+
+  server.tool(
+    "twelvedata_get_end_of_day_price",
+    "Get the end-of-day (closing) price for an instrument. Pass a date for a specific historical day; omit it to return the latest trading day.",
+    {
+      symbol,
+      exchange,
+      mic_code: micCode,
+      country,
+      date: z.string().optional().describe("Specific historical date in YYYY-MM-DD format, e.g. 2006-01-02; omit for the latest trading day."),
+      prepost,
+      dp,
+    },
+    async ({ symbol, exchange, mic_code, country, date, prepost, dp }) =>
+      jsonText(
+        await callTwelveData(apiKey, "eod", {
+          symbol,
+          exchange,
+          mic_code,
+          country,
+          date,
+          prepost,
+          dp,
+        }),
+      ),
+  );
+
+  server.tool(
+    "twelvedata_search_symbols",
+    "Search instruments by ticker, name, ISIN or FIGI; returns matching symbols with name, exchange, MIC, type, country and currency.",
+    {
+      symbol: z.string().min(1).describe("Search keyword; supports ticker symbol, ISIN, FIGI, etc."),
+      outputsize: z.number().int().min(1).max(120).optional().describe("Number of matches to return, max 120, default 30."),
+      show_plan: z.boolean().optional().describe("Whether to include plan availability info in results, default false."),
+    },
+    async ({ symbol, outputsize, show_plan }) =>
+      jsonText(await callTwelveData(apiKey, "symbol_search", { symbol, outputsize, show_plan })),
+  );
+
+  return server;
+}
+
 function createHandler(server: McpServer, route: string) {
   const transport = new WorkerTransport({
     corsOptions: {
@@ -449,6 +592,10 @@ function healthResponse(): Response {
         caiyun: {
           mcp: "/caiyun/mcp",
           auth: "Authorization: Bearer <caiyun-api-token>",
+        },
+        twelvedata: {
+          mcp: "/twelvedata/mcp",
+          auth: "Authorization: Bearer <twelvedata-api-token>",
         },
       },
     }),
@@ -492,8 +639,16 @@ export default {
       return createHandler(createCaiyunServer(bearerToken), "/caiyun/mcp")(request, env, ctx);
     }
 
+    if (url.pathname === "/twelvedata/mcp") {
+      if (!bearerToken) {
+        return unauthorized("twelvedata-mcp");
+      }
+
+      return createHandler(createTwelveDataServer(bearerToken), "/twelvedata/mcp")(request, env, ctx);
+    }
+
     return notFound();
   },
 } satisfies ExportedHandler<Env>;
 
-export { createCaiyunServer, createWeReadServer };
+export { createCaiyunServer, createTwelveDataServer, createWeReadServer };
