@@ -18,3 +18,6 @@ All endpoints except `/yahoo-finance/mcp` use MCP `Authorization: Bearer <token>
 
 The endpoints implement the stateless MCP `2026-07-28` protocol and retain the
 Agents SDK's stateless compatibility path for ordinary legacy clients.
+
+## BuyWhere
+https://api.buywhere.ai/mcp - Shopping and product discovery MCP server for AI assistants.
